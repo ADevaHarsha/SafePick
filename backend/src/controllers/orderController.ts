@@ -76,7 +76,8 @@ export async function createOrder(req: Request, res: Response): Promise<void> {
     order_id = generateOrderId();
   }
 
-  const qr = await qrService.generateQrDataUrl(order_id);
+  const baseUrl = process.env.PUBLIC_APP_URL || "http://localhost:9002";
+  const qr = await qrService.generateQrDataUrl(`${baseUrl}/p/${order_id}`);
 
   const row = await orderModel.insertOrder({
     order_id,
@@ -179,6 +180,7 @@ export async function collect(req: Request, res: Response): Promise<void> {
 
   res.json(updated);
 }
+
 export async function remind(req: Request, res: Response): Promise<void> {
   const { orderId } = req.params;
   if (!orderId) throw new HttpError(400, "orderId is required");

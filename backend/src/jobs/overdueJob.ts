@@ -18,7 +18,6 @@ export async function runOverdueJob(): Promise<number> {
          AND created_at < NOW() - INTERVAL '7 days'`,
     );
 
-    // 2. Fetch active orders waiting > 2 days since last reminder or creation
     const r = await pool.query<OrderRow>(
       `SELECT * FROM orders 
        WHERE status IN ('stored', 'overdue')
@@ -27,9 +26,14 @@ export async function runOverdueJob(): Promise<number> {
 
     let sent = 0;
     for (const order of r.rows) {
-      await smsService.sendReminderSms(String(order.phone_number), order.order_id, order.status === 'overdue');
-      await pool.query(`UPDATE orders SET last_reminded_at = NOW() WHERE id = $1`, [order.id]);
-      sent++;
+      try {
+        await smsService.sendReminderSms(String(order.phone_number), order.order_id, order.status === 'overdue');
+        await pool.query(`UPDATE orders SET last_reminded_at = NOW() WHERE id = $1`, [order.id]);
+        sent++;
+      } catch (smsErr) {
+        console.error(`[reminder failed] order ${order.order_id} -> ${order.phone_number}:`, smsErr);
+        // Continue to the next order even if one fails
+      }
     }
 
     return sent;

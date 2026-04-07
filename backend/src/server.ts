@@ -39,6 +39,21 @@ app.use(errorHandler);
 
 app.listen(port, () => {
   console.log(`SafePick API listening on http://localhost:${port}`);
+  
+  // Also run the overdue check once on startup for development convenience!
+  void runOverdueJob()
+    .then((n) => console.log(`[startup overdue] checked and reminded ${n} orders`))
+    .catch((err) => console.error("[startup error]", err));
+});
+
+// A manual trigger for administrators to force a reminder check
+app.get("/api/admin/trigger-reminders", async (req, res) => {
+  try {
+    const n = await runOverdueJob();
+    res.json({ success: true, count: n, message: `Successfully checked and sent ${n} reminders.` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 cron.schedule("0 0 * * *", () => {
