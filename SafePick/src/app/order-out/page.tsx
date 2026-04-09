@@ -171,7 +171,11 @@ export default function OrderOutPage() {
                 <Scanner 
                   onScan={(result) => {
                     if (result && result.length > 0) {
-                      const rawId = result[0].rawValue;
+                      let rawId = result[0].rawValue;
+                      if (rawId.includes('/p/')) {
+                        rawId = rawId.split('/p/').pop()?.split('?')[0] || rawId;
+                      }
+                      
                       if (!loading && orderIdInput !== rawId) {
                         setOrderIdInput(rawId);
                         // Using a small timeout to let state update smoothly
