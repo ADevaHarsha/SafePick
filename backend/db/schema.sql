@@ -19,14 +19,17 @@ CREATE TABLE orders (
     rack_number VARCHAR(20),
     status order_status DEFAULT 'stored',
     qr_code_base64 TEXT,
-    otp_code VARCHAR(6),
+    otp_code TEXT,
     otp_expires_at TIMESTAMP,
     otp_verified BOOLEAN DEFAULT FALSE,
+    otp_attempts INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     collected_at TIMESTAMP,
+    last_reminded_at TIMESTAMP,
     created_by INTEGER REFERENCES users (id)
 );
 
 CREATE INDEX idx_orders_order_id ON orders (order_id);
 CREATE INDEX idx_orders_status ON orders (status);
 CREATE INDEX idx_orders_created_at ON orders (created_at);
+CREATE INDEX idx_orders_phone ON orders (phone_number);

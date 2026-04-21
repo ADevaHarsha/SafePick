@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Shield, Lock, User, AlertCircle } from "lucide-react";
+import { setAuthToken } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,7 +38,7 @@ export default function LoginPage() {
         throw new Error(data.message || data.error || "Authentication failed");
       }
 
-      localStorage.setItem("token", data.token);
+      setAuthToken(data.token);
       router.push("/dashboard");
     } catch (err: any) {
       setError(err.message);

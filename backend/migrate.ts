@@ -9,7 +9,12 @@ const pool = new pg.Pool({
 async function run() {
   try {
     await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS last_reminded_at TIMESTAMP;`);
-    console.log("Migration complete: added last_reminded_at");
+    console.log("Migration: last_reminded_at OK");
+    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS otp_attempts INTEGER DEFAULT 0;`);
+    console.log("Migration: otp_attempts OK");
+    await pool.query(`ALTER TABLE orders ALTER COLUMN otp_code TYPE TEXT;`);
+    console.log("Migration: otp_code column widened to TEXT OK");
+    console.log("All migrations complete.");
   } catch (err) {
     console.error("Migration failed:", err);
   } finally {

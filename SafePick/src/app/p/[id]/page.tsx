@@ -5,7 +5,6 @@ type PublicOrderDetails = {
   order_id: string;
   created_at: string;
   rack_number: string | null;
-  qr_code_base64: string;
 };
 
 export default async function PublicTrackingPage({ params }: { params: Promise<{ id: string }> }) {
@@ -53,31 +52,21 @@ export default async function PublicTrackingPage({ params }: { params: Promise<{
         </div>
 
         <CardContent className="p-8 space-y-6">
-          <div className="grid sm:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">System Unique ID</p>
-                <p className="font-mono font-bold text-primary">{order.order_id}</p>
-              </div>
-              <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">Storage Timestamp</p>
-                <p className="font-medium text-sm">{new Date(order.created_at).toLocaleString()}</p>
-              </div>
-              <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">Storage Location</p>
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <p className="font-medium text-sm">{order.rack_number || "Awaiting Placement"}</p>
-                </div>
-              </div>
+          <div className="space-y-4">
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">System Unique ID</p>
+              <p className="font-mono font-bold text-primary">{order.order_id}</p>
             </div>
-
-            <div className="bg-white/5 border border-white/10 rounded-xl p-6 flex flex-col items-center justify-center text-center">
-              <div className="bg-white p-2 rounded-lg mb-4">
-                <img src={order.qr_code_base64} alt={`QR for ${order.order_id}`} className="w-40 h-40 object-contain" />
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">Storage Timestamp</p>
+              <p className="font-medium text-sm">{new Date(order.created_at).toLocaleString()}</p>
+            </div>
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">Storage Location</p>
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                <p className="font-medium text-sm">{order.rack_number || "Awaiting Placement"}</p>
               </div>
-              <h3 className="font-bold text-sm">Encrypted Token QR</h3>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">LINKED TO {order.order_id}</p>
             </div>
           </div>
         </CardContent>

@@ -13,8 +13,10 @@ export type OrderRow = {
   otp_code: string | null;
   otp_expires_at: Date | null;
   otp_verified: boolean;
+  otp_attempts: number;
   created_at: Date;
   collected_at: Date | null;
+  last_reminded_at: Date | null;
   created_by: number | null;
 };
 
@@ -32,14 +34,14 @@ export type NewOrderInput = {
 const orderSelect = `id, order_id, receiver_name, phone_number, description, location, rack_number,
             status, qr_code_base64, otp_code, otp_expires_at, otp_verified, created_at, collected_at, created_by`;
 
-export async function listOrders(limit = 200): Promise<OrderRow[]> {
+export async function listOrders(limit = 200, offset = 0): Promise<OrderRow[]> {
   const pool = getPool();
   const r = await pool.query<OrderRow>(
     `SELECT ${orderSelect}
      FROM orders
      ORDER BY created_at DESC
-     LIMIT $1`,
-    [limit],
+     LIMIT $1 OFFSET $2`,
+    [limit, offset],
   );
   return r.rows;
 }
@@ -80,7 +82,7 @@ export async function setOtpForOrder(
   const pool = getPool();
   const r = await pool.query<OrderRow>(
     `UPDATE orders
-     SET otp_code = $1, otp_expires_at = $2, otp_verified = false
+     SET otp_code = $1, otp_expires_at = $2, otp_verified = false, otp_attempts = 0
      WHERE order_id = $3
      RETURNING *`,
     [code, expiresAt, orderId],
@@ -126,4 +128,13 @@ export async function updateOrderRack(orderId: string, rack: string): Promise<Or
 export async function updateLastReminded(orderId: string): Promise<void> {
   const pool = getPool();
   await pool.query(`UPDATE orders SET last_reminded_at = NOW() WHERE order_id = $1`, [orderId]);
+}
+
+export async function incrementOtpAttempts(orderId: string): Promise<number> {
+  const pool = getPool();
+  const r = await pool.query<{ otp_attempts: number }>(
+    `UPDATE orders SET otp_attempts = otp_attempts + 1 WHERE order_id = $1 RETURNING otp_attempts`,
+    [orderId],
+  );
+  return r.rows[0]?.otp_attempts ?? 999;
 }

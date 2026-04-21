@@ -26,7 +26,7 @@ export async function register(req: Request, res: Response): Promise<void> {
   if (username.length > 50 || password.length < 6) {
     throw new HttpError(400, "invalid username or password length");
   }
-  const role = body.role === "admin" ? "admin" : "security";
+  const role = "security"; // Never trust a client-supplied role — promote via DB only
   const existing = await userModel.findUserByUsername(username);
   if (existing) {
     throw new HttpError(409, "username already taken");

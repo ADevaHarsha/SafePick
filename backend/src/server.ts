@@ -5,6 +5,7 @@ import express from "express";
 import helmet from "helmet";
 import { runOverdueJob } from "./jobs/overdueJob.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import { requireAuth } from "./middleware/authMiddleware.js";
 import { analyticsRoutes } from "./routes/analyticsRoutes.js";
 import { authRoutes } from "./routes/authRoutes.js";
 import { orderRoutes } from "./routes/orderRoutes.js";
@@ -14,7 +15,11 @@ const app = express();
 const port = Number(process.env.PORT) || 4000;
 
 app.use(helmet());
-app.use(cors({ origin: process.env.CORS_ORIGIN ?? true }));
+const allowedOrigin = process.env.CORS_ORIGIN;
+if (!allowedOrigin && process.env.NODE_ENV === "production") {
+  throw new Error("CORS_ORIGIN must be set in production");
+}
+app.use(cors({ origin: allowedOrigin ?? "http://localhost:9002" }));
 app.use(express.json({ limit: "2mb" }));
 
 app.get("/", (_req, res) => {
@@ -47,7 +52,11 @@ app.listen(port, () => {
 });
 
 // A manual trigger for administrators to force a reminder check
-app.get("/api/admin/trigger-reminders", async (req, res) => {
+app.get("/api/admin/trigger-reminders", requireAuth, async (req, res) => {
+  if (req.user?.role !== "admin") {
+    res.status(403).json({ error: "Admins only" });
+    return;
+  }
   try {
     const n = await runOverdueJob();
     res.json({ success: true, count: n, message: `Successfully checked and sent ${n} reminders.` });

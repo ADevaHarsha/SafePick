@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
 import type { Request, Response } from "express";
 import { HttpError } from "../middleware/errorHandler.js";
@@ -11,8 +12,12 @@ function generateOrderId(): string {
   return `SP-${Date.now().toString(36).toUpperCase()}`;
 }
 
-export async function listOrders(_req: Request, res: Response): Promise<void> {
-  const rows = await orderModel.listOrders();
+export async function listOrders(req: Request, res: Response): Promise<void> {
+  const page = Math.max(1, parseInt(req.query.page as string) || 1);
+  const limit = Math.max(1, Math.min(1000, parseInt(req.query.limit as string) || 200));
+  const offset = (page - 1) * limit;
+
+  const rows = await orderModel.listOrders(limit, offset);
   res.json(rows);
 }
 
@@ -42,7 +47,7 @@ export async function getPublicOrderDetails(req: Request, res: Response): Promis
     order_id: row.order_id,
     created_at: row.created_at,
     rack_number: row.rack_number,
-    qr_code_base64: row.qr_code_base64,
+    // QR code deliberately omitted from public tracking for security
   });
 }
 
@@ -74,6 +79,11 @@ export async function createOrder(req: Request, res: Response): Promise<void> {
     const clash = await orderModel.findByPublicOrderId(order_id);
     if (!clash) break;
     order_id = generateOrderId();
+  }
+  // Guard: if we still clash after 5 attempts, fail cleanly
+  const finalClash = await orderModel.findByPublicOrderId(order_id);
+  if (finalClash) {
+    throw new HttpError(500, "Could not generate a unique order ID. Please retry.");
   }
 
   const baseUrl = process.env.PUBLIC_APP_URL || "http://localhost:9002";
@@ -111,7 +121,10 @@ export async function sendOtp(req: Request, res: Response): Promise<void> {
   const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-  const updated = await orderModel.setOtpForOrder(orderId, code, expiresAt);
+  // Hash OTP before storing — never keep plaintext codes in the DB
+  const codeHash = await bcrypt.hash(code, 10);
+
+  const updated = await orderModel.setOtpForOrder(orderId, codeHash, expiresAt);
   if (!updated) {
     throw new HttpError(500, "failed to save OTP");
   }
@@ -145,8 +158,18 @@ export async function verifyOtp(req: Request, res: Response): Promise<void> {
   if (new Date() > new Date(row.otp_expires_at)) {
     throw new HttpError(400, "OTP expired");
   }
-  if (row.otp_code !== raw) {
-    throw new HttpError(403, "invalid code");
+
+  // Brute-force lockout: max 5 attempts per OTP
+  const MAX_ATTEMPTS = 5;
+  if ((row.otp_attempts ?? 0) >= MAX_ATTEMPTS) {
+    throw new HttpError(429, "Too many incorrect attempts. Please request a new OTP.");
+  }
+
+  const codeMatch = await bcrypt.compare(raw, row.otp_code);
+  if (!codeMatch) {
+    await orderModel.incrementOtpAttempts(orderId);
+    const remaining = MAX_ATTEMPTS - ((row.otp_attempts ?? 0) + 1);
+    throw new HttpError(403, `Invalid code. ${remaining} attempt(s) remaining.`);
   }
 
   const updated = await orderModel.setOtpVerified(orderId);
@@ -175,8 +198,11 @@ export async function collect(req: Request, res: Response): Promise<void> {
     throw new HttpError(400, "cannot collect — check status or OTP");
   }
 
-  // Send security notification after successful collect
-  await smsService.sendOrderCollectedNotification(String(row.phone_number), orderId);
+  // Send notification — intentionally non-blocking so a Twilio hiccup
+  // doesn't roll back an already-recorded collection.
+  smsService.sendOrderCollectedNotification(String(row.phone_number), orderId).catch((err) => {
+    console.error("[collect sms failed]", err);
+  });
 
   res.json(updated);
 }
