@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Search, Filter, MoreHorizontal, Package, Clock, ShieldCheck, AlertTriangle, X, Trash, RefreshCw, Send, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -45,7 +45,7 @@ export default function OrdersPage() {
   const [rackOrder, setRackOrder] = useState<Order | null>(null);
   const [newRackInput, setNewRackInput] = useState("");
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
       const res = await api.get("/api/orders");
@@ -67,11 +67,11 @@ export default function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [fetchOrders]);
 
   const handleSendReminder = async (orderId: string) => {
     try {

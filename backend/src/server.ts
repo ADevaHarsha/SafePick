@@ -40,17 +40,6 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/public", publicRoutes);
 
-app.use(errorHandler);
-
-app.listen(port, () => {
-  console.log(`SafePick API listening on http://localhost:${port}`);
-  
-  // Also run the overdue check once on startup for development convenience!
-  void runOverdueJob()
-    .then((n) => console.log(`[startup overdue] checked and reminded ${n} orders`))
-    .catch((err) => console.error("[startup error]", err));
-});
-
 // A manual trigger for administrators to force a reminder check
 app.get("/api/admin/trigger-reminders", requireAuth, async (req, res) => {
   if (req.user?.role !== "admin") {
@@ -65,10 +54,19 @@ app.get("/api/admin/trigger-reminders", requireAuth, async (req, res) => {
   }
 });
 
+app.use(errorHandler);
+
+app.listen(port, () => {
+  console.log(`SafePick API listening on http://localhost:${port}`);
+
+  // Run the overdue check once on startup for development convenience
+  void runOverdueJob()
+    .then((n) => console.log(`[startup overdue] checked and reminded ${n} orders`))
+    .catch((err) => console.error("[startup error]", err));
+});
+
 cron.schedule("0 0 * * *", () => {
   void runOverdueJob()
     .then((n) => console.log(`[cron overdue] updated ${n} row(s)`))
     .catch((err) => console.error("[cron overdue]", err));
 });
-
-// Trigger reload for new .env variables

@@ -7,10 +7,7 @@ import * as qrService from "../services/qrService.js";
 import * as smsService from "../services/smsService.js";
 import { parseTenDigitPhone } from "../util/phone.js";
 
-/** Prefix + base36 timestamp (fits VARCHAR(20), stable & sortable). */
-function generateOrderId(): string {
-  return `SP-${Date.now().toString(36).toUpperCase()}`;
-}
+
 
 export async function listOrders(req: Request, res: Response): Promise<void> {
   const page = Math.max(1, parseInt(req.query.page as string) || 1);
@@ -38,16 +35,25 @@ export async function getPublicOrderDetails(req: Request, res: Response): Promis
   if (!orderId) {
     throw new HttpError(400, "orderId is required");
   }
+  console.log(`[Public API] Fetching details for Order ID: ${orderId}`);
   const row = await orderModel.findByPublicOrderId(orderId);
   if (!row) {
+    console.warn(`[Public API] Order not found for ID: ${orderId}`);
     throw new HttpError(404, "order not found");
   }
   
+  let qrCode = row.qr_code_base64;
+  if (!qrCode) {
+    console.log(`[Public API] Generating missing QR code dynamically for: ${row.order_id}`);
+    qrCode = await qrService.generateQrDataUrl(row.order_id);
+  }
+
   res.json({
     order_id: row.order_id,
     created_at: row.created_at,
     rack_number: row.rack_number,
-    // QR code deliberately omitted from public tracking for security
+    qr_code_base64: qrCode,
+    status: row.status,
   });
 }
 
@@ -74,20 +80,30 @@ export async function createOrder(req: Request, res: Response): Promise<void> {
   }
   const phone_number = parseTenDigitPhone(rawPhone);
 
-  let order_id = generateOrderId();
+  console.log(`[Order Intake] Creating order for receiver: "${receiver_name}", phone: ${phone_number}`);
+
+  let order_id = await orderModel.getNextOrderId();
+  console.log(`[Order Intake] Candidate Order ID generated: ${order_id}`);
+
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const clash = await orderModel.findByPublicOrderId(order_id);
     if (!clash) break;
-    order_id = generateOrderId();
+    console.warn(`[Order Intake] Collision detected for ID: ${order_id}. Incrementing and retrying...`);
+    const numPart = order_id.substring(3);
+    const nextNum = parseInt(numPart, 10) + 1;
+    order_id = `ORD${String(nextNum).padStart(6, "0")}`;
   }
+  
   // Guard: if we still clash after 5 attempts, fail cleanly
   const finalClash = await orderModel.findByPublicOrderId(order_id);
   if (finalClash) {
+    console.error(`[Order Intake] Persistent collision failed to resolve for candidate ${order_id}`);
     throw new HttpError(500, "Could not generate a unique order ID. Please retry.");
   }
 
-  const baseUrl = process.env.PUBLIC_APP_URL || "http://localhost:9002";
-  const qr = await qrService.generateQrDataUrl(`${baseUrl}/p/${order_id}`);
+  console.log(`[Order Intake] Using final unique Order ID: ${order_id}`);
+  const qr = await qrService.generateQrDataUrl(order_id);
+  console.log(`[Order Intake] Generated QR data URL encoding exactly: ${order_id}`);
 
   const row = await orderModel.insertOrder({
     order_id,
@@ -100,7 +116,11 @@ export async function createOrder(req: Request, res: Response): Promise<void> {
     created_by: uid,
   });
 
-  await smsService.sendOrderIntakeNotification(String(phone_number), order_id);
+  try {
+    await smsService.sendOrderIntakeNotification(String(phone_number), order_id);
+  } catch (smsErr: any) {
+    console.error(`[Order Intake] SMS notification failed for Order ID: ${order_id}`, smsErr);
+  }
 
   res.status(201).json(row);
 }
@@ -110,11 +130,14 @@ export async function sendOtp(req: Request, res: Response): Promise<void> {
   if (!orderId) {
     throw new HttpError(400, "orderId is required");
   }
+  console.log(`[OTP Service] Initiating OTP send for Order ID: ${orderId}`);
   const row = await orderModel.findByPublicOrderId(orderId);
   if (!row) {
+    console.warn(`[OTP Service] Order not found for ID: ${orderId}`);
     throw new HttpError(404, "order not found");
   }
   if (row.status === "collected") {
+    console.warn(`[OTP Service] Attempted to send OTP for already-collected order: ${orderId}`);
     throw new HttpError(400, "order already collected");
   }
 
@@ -126,9 +149,11 @@ export async function sendOtp(req: Request, res: Response): Promise<void> {
 
   const updated = await orderModel.setOtpForOrder(orderId, codeHash, expiresAt);
   if (!updated) {
+    console.error(`[OTP Service] Database failed to store OTP hash for order: ${orderId}`);
     throw new HttpError(500, "failed to save OTP");
   }
 
+  console.log(`[OTP Service] OTP stored successfully. Sending SMS to recipient...`);
   await smsService.sendOtpSms(String(row.phone_number), code);
 
   res.json({
@@ -148,20 +173,25 @@ export async function verifyOtp(req: Request, res: Response): Promise<void> {
     throw new HttpError(400, "code must be a 6-digit string");
   }
 
+  console.log(`[OTP Verification] Verifying OTP code for Order ID: ${orderId}`);
   const row = await orderModel.findByPublicOrderId(orderId);
   if (!row) {
+    console.warn(`[OTP Verification] Order not found for ID: ${orderId}`);
     throw new HttpError(404, "order not found");
   }
   if (!row.otp_code || !row.otp_expires_at) {
+    console.warn(`[OTP Verification] Verification failed: No OTP has been sent for order ${orderId}`);
     throw new HttpError(400, "no OTP sent for this order");
   }
   if (new Date() > new Date(row.otp_expires_at)) {
+    console.warn(`[OTP Verification] Verification failed: OTP has expired for order ${orderId}`);
     throw new HttpError(400, "OTP expired");
   }
 
   // Brute-force lockout: max 5 attempts per OTP
   const MAX_ATTEMPTS = 5;
   if ((row.otp_attempts ?? 0) >= MAX_ATTEMPTS) {
+    console.warn(`[OTP Verification] Verification blocked: Max attempts (${MAX_ATTEMPTS}) exceeded for order ${orderId}`);
     throw new HttpError(429, "Too many incorrect attempts. Please request a new OTP.");
   }
 
@@ -169,14 +199,17 @@ export async function verifyOtp(req: Request, res: Response): Promise<void> {
   if (!codeMatch) {
     await orderModel.incrementOtpAttempts(orderId);
     const remaining = MAX_ATTEMPTS - ((row.otp_attempts ?? 0) + 1);
+    console.warn(`[OTP Verification] Verification failed: Invalid code entered for order ${orderId}. Remaining attempts: ${remaining}`);
     throw new HttpError(403, `Invalid code. ${remaining} attempt(s) remaining.`);
   }
 
   const updated = await orderModel.setOtpVerified(orderId);
   if (!updated) {
+    console.error(`[OTP Verification] Database failed to set otp_verified to true for order: ${orderId}`);
     throw new HttpError(500, "failed to verify OTP");
   }
 
+  console.log(`[OTP Verification] OTP successfully verified for Order ID: ${orderId}`);
   res.json({ order_id: orderId, otp_verified: true });
 }
 
@@ -185,23 +218,28 @@ export async function collect(req: Request, res: Response): Promise<void> {
   if (!orderId) {
     throw new HttpError(400, "orderId is required");
   }
+  console.log(`[Order Pickup] Processing pickup collection for Order ID: ${orderId}`);
   const row = await orderModel.findByPublicOrderId(orderId);
   if (!row) {
+    console.warn(`[Order Pickup] Order not found for ID: ${orderId}`);
     throw new HttpError(404, "order not found");
   }
   if (!row.otp_verified) {
+    console.warn(`[Order Pickup] Pickup blocked: OTP not verified for order ${orderId}`);
     throw new HttpError(400, "OTP must be verified before collection");
   }
 
   const updated = await orderModel.collectOrder(orderId);
   if (!updated) {
+    console.error(`[Order Pickup] Database failed to record collection for order: ${orderId}`);
     throw new HttpError(400, "cannot collect — check status or OTP");
   }
 
+  console.log(`[Order Pickup] Collection registered in DB for: ${orderId}. Dispatching collection SMS...`);
   // Send notification — intentionally non-blocking so a Twilio hiccup
   // doesn't roll back an already-recorded collection.
   smsService.sendOrderCollectedNotification(String(row.phone_number), orderId).catch((err) => {
-    console.error("[collect sms failed]", err);
+    console.error(`[Order Pickup] Collection notification SMS failed for order: ${orderId}`, err);
   });
 
   res.json(updated);

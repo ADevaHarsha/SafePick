@@ -15,7 +15,7 @@ export default function DashboardPage() {
 
       <div className="grid gap-6 md:grid-cols-2">
         <Link href="/order-in" className="group">
-          <Card className="glass-card h-64 flex flex-col items-center justify-center gap-4 text-center border-white/5 transition-all group-hover:glow-orange group-hover:border-primary/50">
+          <Card className="glass-card relative h-64 flex flex-col items-center justify-center gap-4 text-center border-white/5 transition-all group-hover:glow-orange group-hover:border-primary/50">
             <CardContent className="flex flex-col items-center p-0">
               <div className="mb-4 rounded-2xl bg-primary/10 p-6 group-hover:bg-primary/20 transition-all duration-500 transform group-hover:scale-110 group-hover:-rotate-3">
                 <PackagePlus className="h-12 w-12 text-primary" />
@@ -28,7 +28,7 @@ export default function DashboardPage() {
         </Link>
 
         <Link href="/order-out" className="group">
-          <Card className="glass-card h-64 flex flex-col items-center justify-center gap-4 text-center border-white/5 transition-all group-hover:glow-purple group-hover:border-accent/50">
+          <Card className="glass-card relative h-64 flex flex-col items-center justify-center gap-4 text-center border-white/5 transition-all group-hover:glow-purple group-hover:border-accent/50">
             <CardContent className="flex flex-col items-center p-0">
               <div className="mb-4 rounded-2xl bg-accent/10 p-6 group-hover:bg-accent/20 transition-all duration-500 transform group-hover:scale-110 group-hover:rotate-3">
                 <PackageCheck className="h-12 w-12 text-accent" />
@@ -43,7 +43,7 @@ export default function DashboardPage() {
 
       <div className="grid gap-6">
         <Link href="/orders" className="group">
-          <Card className="glass-card h-48 flex flex-col items-center justify-center gap-4 text-center border-white/5 transition-all group-hover:shadow-[0_0_30px_rgba(59,130,246,0.2)] group-hover:border-blue-500/50">
+          <Card className="glass-card relative h-48 flex flex-col items-center justify-center gap-4 text-center border-white/5 transition-all group-hover:shadow-[0_0_30px_rgba(59,130,246,0.2)] group-hover:border-blue-500/50">
             <CardContent className="flex flex-col items-center p-0">
               <div className="mb-2 rounded-2xl bg-blue-500/10 p-4 group-hover:bg-blue-500/20 transition-all duration-500 transform group-hover:scale-110">
                 <Database className="h-10 w-10 text-blue-500" />
@@ -55,6 +55,7 @@ export default function DashboardPage() {
           </Card>
         </Link>
       </div>
+
     </div>
   );
 }

@@ -96,7 +96,13 @@ export default function OrderInPage() {
                 </div>
               </div>
               <Button
-                onClick={() => setIsSubmitted(false)}
+                onClick={() => {
+                  setIsSubmitted(false);
+                  setFormData({ receiverName: "", phoneNumber: "", description: "", location: "", rackNumber: "" });
+                  setQrSrc(null);
+                  setOrderId("");
+                  setTimestamp("");
+                }}
                 variant="outline"
                 className="w-full border-primary/20 hover:bg-primary/5"
               >

@@ -32,7 +32,8 @@ export type NewOrderInput = {
 };
 
 const orderSelect = `id, order_id, receiver_name, phone_number, description, location, rack_number,
-            status, qr_code_base64, otp_code, otp_expires_at, otp_verified, created_at, collected_at, created_by`;
+            status, qr_code_base64, otp_code, otp_expires_at, otp_verified, otp_attempts,
+            created_at, collected_at, last_reminded_at, created_by`;
 
 export async function listOrders(limit = 200, offset = 0): Promise<OrderRow[]> {
   const pool = getPool();
@@ -138,3 +139,21 @@ export async function incrementOtpAttempts(orderId: string): Promise<number> {
   );
   return r.rows[0]?.otp_attempts ?? 999;
 }
+
+export async function getNextOrderId(): Promise<string> {
+  const pool = getPool();
+  const r = await pool.query<{ order_id: string }>(
+    `SELECT order_id FROM orders 
+     WHERE order_id ~ '^ORD\\d+$' 
+     ORDER BY order_id DESC 
+     LIMIT 1`
+  );
+  if (r.rows.length === 0) {
+    return "ORD000001";
+  }
+  const lastId = r.rows[0].order_id;
+  const numPart = lastId.substring(3);
+  const nextNum = parseInt(numPart, 10) + 1;
+  return `ORD${String(nextNum).padStart(6, "0")}`;
+}
+

@@ -72,6 +72,14 @@ export default function OrderOutPage() {
     setLoading(true);
     try {
       const { data } = await api.get<OrderDetail>(`/api/orders/${encodeURIComponent(id)}`);
+      if (data.status === "collected") {
+        toast({
+          variant: "destructive",
+          title: "Already Collected",
+          description: `Order ${data.order_id} has already been collected. No action needed.`,
+        });
+        return;
+      }
       setOrder(data);
       setStep(2);
     } catch (err: unknown) {

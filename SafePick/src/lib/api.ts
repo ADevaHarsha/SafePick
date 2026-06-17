@@ -21,6 +21,10 @@ api.interceptors.response.use(
   (err) => {
     if (err.response?.status === 401) {
       clearAuthToken();
+      // Redirect to login page so user isn't stuck on a protected page
+      if (typeof window !== "undefined" && window.location.pathname !== "/") {
+        window.location.href = "/";
+      }
     }
     return Promise.reject(err);
   },

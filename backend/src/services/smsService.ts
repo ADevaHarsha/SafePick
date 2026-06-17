@@ -5,7 +5,7 @@ import twilio from "twilio";
  */
 export async function sendOrderIntakeNotification(phone: string, orderId: string): Promise<void> {
   const baseUrl = process.env.PUBLIC_APP_URL || "http://localhost:9002";
-  const body = `SafePick: Order received and stored. Order ID: ${orderId}. Use this ID/QR to collect your order: ${baseUrl}/p/${orderId}`;
+  const body = `SafePick: Order received and stored. Order ID: ${orderId}. Use this ID/QR to collect your order: ${baseUrl}/order/${orderId}`;
   await deliverSms(phone, body);
 }
 

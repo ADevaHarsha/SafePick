@@ -96,18 +96,18 @@ export default function LoginPage() {
                 />
               </div>
             </div>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full bg-gradient-to-r from-primary to-orange-600 font-semibold shadow-lg glow-orange transition-all hover:scale-[1.02] active:scale-[0.98]"
               disabled={loading}
             >
               {loading ? "Please wait..." : (isRegister ? "Register Account" : "Login to System")}
             </Button>
-            
+
             <div className="text-center text-sm text-muted-foreground mt-4">
               {isRegister ? "Already have an account? " : "Don't have an account? "}
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => setIsRegister(!isRegister)}
                 className="text-primary hover:underline font-medium focus:outline-none"
               >

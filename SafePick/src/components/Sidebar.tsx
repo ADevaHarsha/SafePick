@@ -38,7 +38,15 @@ export function Sidebar() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    setHasToken(!!getAuthToken());
+    const sync = () => setHasToken(!!getAuthToken());
+    sync();
+    // Re-check when the tab becomes visible or localStorage changes in another tab
+    window.addEventListener("storage", sync);
+    document.addEventListener("visibilitychange", sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      document.removeEventListener("visibilitychange", sync);
+    };
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {

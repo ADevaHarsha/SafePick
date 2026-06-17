@@ -13,7 +13,8 @@ export function getPool(): pg.Pool {
     if (!connectionString) {
       throw new Error("DATABASE_URL is not set");
     }
-    pool = new Pool({ connectionString, max: 10 });
+    const ssl = process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : undefined;
+    pool = new Pool({ connectionString, max: 10, ssl });
   }
   return pool;
 }
