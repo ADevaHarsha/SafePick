@@ -1,15 +1,20 @@
-    -- SafePick Phase 1: core schema (PostgreSQL)
+-- SafePick Phase 1: core schema (PostgreSQL)
 
-CREATE TYPE order_status AS ENUM ('stored', 'collected', 'overdue');
+-- Create the status enum type conditionally to avoid errors if it already exists
+DO $$ BEGIN
+    CREATE TYPE order_status AS ENUM ('stored', 'collected', 'overdue');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     role VARCHAR(20) DEFAULT 'security' -- 'admin' or 'security'
 );
 
-CREATE TABLE orders (
+CREATE TABLE IF NOT EXISTS orders (
     id SERIAL PRIMARY KEY,
     order_id VARCHAR(20) UNIQUE NOT NULL, -- e.g., SP-K82X1
     receiver_name VARCHAR(100) NOT NULL,
@@ -29,7 +34,7 @@ CREATE TABLE orders (
     created_by INTEGER REFERENCES users (id)
 );
 
-CREATE INDEX idx_orders_order_id ON orders (order_id);
-CREATE INDEX idx_orders_status ON orders (status);
-CREATE INDEX idx_orders_created_at ON orders (created_at);
-CREATE INDEX idx_orders_phone ON orders (phone_number);
+CREATE INDEX IF NOT EXISTS idx_orders_order_id ON orders (order_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders (status);
+CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders (created_at);
+CREATE INDEX IF NOT EXISTS idx_orders_phone ON orders (phone_number);
